@@ -84,7 +84,7 @@ export async function refreshPrices(assets: Asset[]): Promise<Record<string, str
       try {
         const r = await api<{ nav: number | null; date: string }>(`/fund/nav?proj_id=${encodeURIComponent(a.symbol)}`)
         if (r.nav == null) errors[a.id] = 'ไม่พบ NAV'
-        else await db.prices.put({ key: a.id, priceTHB: r.nav, ts: Date.now() })
+        else await db.prices.put({ key: a.id, priceTHB: r.nav, ts: Date.now(), asOf: r.date })
       } catch (e) {
         errors[a.id] = String((e as Error).message)
       }

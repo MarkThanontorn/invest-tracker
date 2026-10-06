@@ -66,7 +66,7 @@ export function AssetDetail({
           <Stat label="กำไรที่ขายแล้ว" value={fmtSigned(h.realizedPL)} cls={plClass(h.realizedPL)} />
         </dl>
         <p className="text-xs text-muted mt-3">
-          {cached ? `ราคาอัปเดต ${fmtTime(cached.ts)}` : a.manualPrice ? 'ใช้ราคาที่กรอกเอง' : 'ยังไม่มีราคา'}
+          {cached ? (cached.asOf ? `NAV ณ วันที่ ${fmtDate(cached.asOf)} (ดึงเมื่อ ${fmtTime(cached.ts)})` : `ราคาอัปเดต ${fmtTime(cached.ts)}`) : a.manualPrice ? 'ใช้ราคาที่กรอกเอง' : 'ยังไม่มีราคา'}
           {' · '}
           <button className="text-accent" onClick={() => setEditPrice(String(a.manualPrice ?? ''))}>
             กรอกราคาเอง

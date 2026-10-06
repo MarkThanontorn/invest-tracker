@@ -31,6 +31,8 @@ export interface PriceCache {
   key: string
   priceTHB: number
   ts: number
+  /** date the price refers to (yyyy-mm-dd), e.g. a fund's NAV date */
+  asOf?: string
 }
 
 export interface HistoryCache {
