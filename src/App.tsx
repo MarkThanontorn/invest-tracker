@@ -22,7 +22,7 @@ const TABS: { tab: Tab; label: string; icon: string }[] = [
 ]
 
 const TITLE: Record<Tab, string> = {
-  home: 'พอร์ตของฉัน',
+  home: 'Invest Tracker',
   assets: 'สินทรัพย์',
   add: 'บันทึกการซื้อ/ขาย',
   charts: 'ผลการลงทุนย้อนหลัง',

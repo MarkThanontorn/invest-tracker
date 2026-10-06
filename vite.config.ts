@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'พอร์ตของฉัน',
-        short_name: 'พอร์ต',
+        name: 'Invest Tracker',
+        short_name: 'Invest Tracker',
         description: 'บันทึกการลงทุนและต้นทุนเฉลี่ย เก็บข้อมูลในเครื่อง',
         theme_color: '#0f172a',
         background_color: '#0f172a',

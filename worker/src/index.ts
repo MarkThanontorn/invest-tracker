@@ -100,7 +100,6 @@ const SEC_BASE = (env: Env) => (env.SEC_API_BASE ?? 'https://api.sec.or.th').rep
 async function secGet(env: Env, path: string, params: Record<string, string>, ttl: number): Promise<any> {
   const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== ''))
   const res = await cachedFetch(`${SEC_BASE(env)}${path}?${qs}`, { headers: secHeaders(env) }, ttl)
-  console.log("SEC status", path, qs.toString(), res.status)
   if (res.status === 204 || res.status === 404) return { items: [], next_cursor: '' }
   if (res.status === 401 || res.status === 403) throw new HttpError(502, 'SEC API key ไม่ถูกต้อง หรือยังไม่ได้ subscribe')
   if (!res.ok) throw new HttpError(502, `sec ${res.status}`)
@@ -164,7 +163,6 @@ async function fundNav(env: Env, symbol: string) {
     const rows = await navRange(env, symbol, isoDaysAgo(days), isoDaysAgo(0), 1800)
     const last = rows[rows.length - 1]
     if (last) {
-      console.log('NAV', symbol, last.date, last.nav)
       return { nav: last.nav, date: last.date }
     }
   }
