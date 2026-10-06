@@ -1,0 +1,12 @@
+node_modules
+dist
+dev-dist
+worker/.wrangler
+worker/node_modules
+worker/.dev.vars
+*.tsbuildinfo
+
+# backup/export files must never be committed (personal investment data)
+invest-backup-*.json
+invest-transactions-*.csv
+*.backup.json

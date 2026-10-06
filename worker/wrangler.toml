@@ -1,0 +1,9 @@
+name = "invest-price-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Set secrets with:
+#   npx wrangler secret put ACCESS_TOKEN
+#   npx wrangler secret put SEC_API_KEY
+[vars]
+ALLOWED_ORIGIN = "*"
