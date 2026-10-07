@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { db, TYPE_LABEL } from '../db'
 import { usePortfolio } from '../hooks'
 import { fmtDate, fmtNum, fmtPct, fmtSigned, fmtTHB, fmtTime, plClass } from '../format'
@@ -19,10 +18,11 @@ export function AssetDetail({
   onChart: () => void
 }) {
   const p = usePortfolio()
-  const txs = useLiveQuery(() => db.transactions.where({ assetId }).reverse().sortBy('date'), [assetId])
   const [editPrice, setEditPrice] = useState<string | null>(null)
   const h = p?.holdings.find((x) => x.asset.id === assetId)
-  if (!h || !txs) return null
+  if (!h || !p) return null
+  // resolved copies, so USD-funded trades show their current THB cost
+  const txs = p.txs.filter((t) => t.assetId === assetId).sort((x, y) => (x.date < y.date ? 1 : -1))
   const a = h.asset
   const unit = UNIT[a.type]
   const cached = p?.priceMap.get(a.id)
@@ -30,6 +30,13 @@ export function AssetDetail({
   async function deleteAsset() {
     if (!confirm(`ลบ ${a.name} และธุรกรรมทั้งหมด ${txs!.length} รายการ?`)) return
     await db.transaction('rw', db.assets, db.transactions, db.prices, async () => {
+      const own = await db.transactions.where({ assetId }).toArray()
+      // trades of this asset take their automatic USD/USDT legs with them
+      const legs = own.filter((t) => t.linkRole !== 'cash' && t.linkedTxId).map((t) => t.linkedTxId!)
+      await db.transactions.bulkDelete(legs)
+      // trades elsewhere that were paid from this cash asset keep their THB snapshot
+      for (const t of own.filter((t) => t.linkRole === 'cash' && t.linkedTxId))
+        await db.transactions.update(t.linkedTxId!, { linkedTxId: undefined })
       await db.transactions.where({ assetId }).delete()
       await db.prices.delete(assetId)
       await db.assets.delete(assetId)
@@ -103,19 +110,37 @@ export function AssetDetail({
         <ul className="divide-y divide-line">
           {txs.map((t) => (
             <li key={t.id}>
-              <button className="w-full text-left px-4 py-3 flex justify-between gap-3" onClick={() => onEdit(t.id)}>
+              <button className="w-full text-left px-4 py-3 flex justify-between gap-3" onClick={() => onEdit(t.linkRole === 'cash' && t.linkedTxId ? t.linkedTxId : t.id)}>
                 <div>
                   <span className={`text-xs font-semibold mr-2 ${t.side === 'BUY' ? 'text-up' : 'text-down'}`}>
                     {t.side === 'BUY' ? 'ซื้อ' : 'ขาย'}
                   </span>
                   <span className="text-sm">{fmtDate(t.date)}</span>
                   <div className="text-xs text-muted tabular">
-                    {fmtNum(t.quantity)} {unit} @ {fmtTHB(t.priceTHB, 4)}
-                    {t.feeTHB ? ` · ค่าธรรมเนียม ${fmtTHB(t.feeTHB)}` : ''}
+                    {t.currency && t.priceFx != null ? (
+                      <>
+                        {fmtNum(t.quantity)} {unit} @ {fmtNum(t.priceFx, 4)} {t.currency}
+                        {t.feeFx ? ` · ค่าธรรมเนียม ${fmtNum(t.feeFx, 2)} ${t.currency}` : ''}
+                        {` · ${t.side === 'BUY' ? 'จ่ายด้วย' : 'รับเป็น'} ${t.currency}`}
+                        {t.fxRate ? ` (฿${fmtNum(t.fxRate, 4)})` : ''}
+                      </>
+                    ) : (
+                      <>
+                        {fmtNum(t.quantity)} {unit} @ {fmtTHB(t.priceTHB, 4)}
+                        {t.feeTHB ? ` · ค่าธรรมเนียม ${fmtTHB(t.feeTHB)}` : ''}
+                      </>
+                    )}
                   </div>
-                  {t.note && <div className="text-xs text-muted">{t.note}</div>}
+                  {t.note && (
+                    <div className="text-xs text-muted">
+                      {t.linkRole === 'cash' && <span className="mr-1 rounded bg-line px-1">อัตโนมัติ</span>}
+                      {t.note}
+                    </div>
+                  )}
                 </div>
-                <div className="tabular font-medium text-sm">{fmtTHB(t.quantity * t.priceTHB)}</div>
+                <div className="tabular font-medium text-sm text-right">
+                  {fmtTHB(t.quantity * t.priceTHB + (t.side === 'BUY' ? t.feeTHB || 0 : -(t.feeTHB || 0)))}
+                </div>
               </button>
             </li>
           ))}

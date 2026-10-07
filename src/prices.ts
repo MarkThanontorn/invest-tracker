@@ -150,3 +150,11 @@ export async function loadHistory(assets: Asset[], range: Range) {
   )
   return { series, errors }
 }
+
+/** THB per 1 USD on a date (USDT is treated as 1 USD). Used to prefill the rate when selling into USD/USDT. */
+export async function usdThbOn(date: string): Promise<number | null> {
+  const daysAgo = (Date.now() - Date.parse(date + 'T00:00:00Z')) / 86400000
+  const range: Range = daysAgo <= 85 ? '3M' : daysAgo <= 360 ? '1Y' : '3Y'
+  const h = await rawHistory(FX_SYMBOL.USD, range)
+  return priceAt(toSeries(h.points), date)
+}

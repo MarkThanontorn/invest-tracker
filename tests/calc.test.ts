@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildHistory, computeHolding, computePosition, goldUsdOzToThaiBaht, summarize, priceAt } from '../src/calc'
+import { buildHistory, computeHolding, computePosition, goldUsdOzToThaiBaht, summarize, priceAt, resolveTransactions } from '../src/calc'
 import type { Asset, Transaction } from '../src/db'
 
 const tx = (p: Partial<Transaction>): Transaction => ({ id: Math.random().toString(), assetId: 'a', side: 'BUY', date: '2025-01-01', quantity: 1, priceTHB: 1, feeTHB: 0, ...p })
@@ -83,5 +83,38 @@ describe('history', () => {
     const h = buildHistory([asset()], txs, series, grid)
     expect(h[2].value).toBe(110 * 11)
     expect(h[2].twr).toBeCloseTo(10) // only the +10% move, not the deposit
+  })
+})
+
+describe('paying with USD from the portfolio', () => {
+  // USD bought at 36 and 34 -> avg 35; AAPL bought with 1,000 USD -> THB cost uses avg 35
+  const txs: Transaction[] = [
+    tx({ id: 'u1', assetId: 'usd', date: '2025-01-01', quantity: 1000, priceTHB: 36 }),
+    tx({ id: 'u2', assetId: 'usd', date: '2025-02-01', quantity: 1000, priceTHB: 34 }),
+    tx({ id: 'a1', assetId: 'aapl', date: '2025-03-01', quantity: 5, priceTHB: 0, currency: 'USD', priceFx: 199, feeFx: 5, linkedTxId: 'leg1' }),
+    tx({ id: 'leg1', assetId: 'usd', side: 'SELL', date: '2025-03-01', quantity: 1000, priceTHB: 0, linkedTxId: 'a1', linkRole: 'cash' }),
+  ]
+  const r = resolveTransactions(txs)
+  const byAsset = (id: string) => r.filter((t) => t.assetId === id)
+
+  it('stock cost = USD spent x USD average cost, fee included', () => {
+    const p = computePosition(byAsset('aapl'))
+    expect(p.costBasis).toBeCloseTo(1000 * 35)
+    expect(p.avgCost).toBeCloseTo(7000)
+  })
+  it('USD position drops by the amount spent with no realized FX P/L', () => {
+    const p = computePosition(byAsset('usd'))
+    expect(p.quantity).toBe(1000)
+    expect(p.avgCost).toBeCloseTo(35)
+    expect(p.realizedPL).toBeCloseTo(0)
+  })
+  it('later backdated USD buy changes the resolved stock cost', () => {
+    const more = resolveTransactions([...txs, tx({ id: 'u0', assetId: 'usd', date: '2024-12-01', quantity: 2000, priceTHB: 32 })])
+    // avg before 2025-03-01 = (36000+34000+64000)/4000 = 33.5
+    expect(computePosition(more.filter((t) => t.assetId === 'aapl')).costBasis).toBeCloseTo(1000 * 33.5)
+  })
+  it('falls back to the stored snapshot when the cash leg is missing', () => {
+    const lone = resolveTransactions([tx({ id: 'x', assetId: 'aapl', quantity: 1, priceTHB: 7000, currency: 'USD', priceFx: 200, linkedTxId: 'gone' })])
+    expect(lone[0].priceTHB).toBe(7000)
   })
 })

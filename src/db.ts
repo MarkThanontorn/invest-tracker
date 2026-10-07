@@ -24,7 +24,32 @@ export interface Transaction {
   priceTHB: number
   feeTHB: number
   note?: string
+  /** Set when the trade was paid / settled in USD or USDT instead of THB */
+  currency?: CashCurrency
+  /** price per unit and fee in `currency` */
+  priceFx?: number
+  feeFx?: number
+  /** THB per 1 unit of `currency`. For BUY it is resolved from the cash position's average cost. */
+  fxRate?: number
+  /** Pair link between a trade and its automatic cash leg (both sides point at each other) */
+  linkedTxId?: string
+  /** 'cash' marks the automatic USD/USDT leg created for a trade */
+  linkRole?: 'cash'
 }
+
+export type CashCurrency = 'USD' | 'USDT'
+export const CASH_ASSET: Record<CashCurrency, { type: AssetType; symbol: string; name: string }> = {
+  USD: { type: 'USD', symbol: 'USDTHB=X', name: 'US Dollar' },
+  USDT: { type: 'CRYPTO', symbol: 'USDT-USD', name: 'Tether (USDT)' },
+}
+/** Which settlement currencies each asset type may use besides THB */
+export function cashOptions(a: Pick<Asset, 'type' | 'symbol'>): CashCurrency[] {
+  if (a.type === 'US_STOCK') return ['USD']
+  if (a.type === 'CRYPTO' && a.symbol !== CASH_ASSET.USDT.symbol) return ['USDT']
+  return []
+}
+export const isCashAsset = (a: Pick<Asset, 'type' | 'symbol'>, cur: CashCurrency) =>
+  a.type === CASH_ASSET[cur].type && a.symbol === CASH_ASSET[cur].symbol
 
 export interface PriceCache {
   /** asset id */

@@ -1,12 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useState } from 'react'
 import { db } from './db'
-import { computeHolding, summarize, type Holding } from './calc'
+import { computeHolding, resolveTransactions, summarize, type Holding } from './calc'
 import { refreshPrices } from './prices'
 
 export function usePortfolio() {
   const data = useLiveQuery(async () => {
-    const [assets, txs, prices] = await Promise.all([db.assets.toArray(), db.transactions.toArray(), db.prices.toArray()])
+    const [assets, rawTxs, prices] = await Promise.all([db.assets.toArray(), db.transactions.toArray(), db.prices.toArray()])
+    const txs = resolveTransactions(rawTxs)
     const priceMap = new Map(prices.map((p) => [p.key, p]))
     const holdings: Holding[] = assets.map((a) =>
       computeHolding(

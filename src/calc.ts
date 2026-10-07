@@ -54,6 +54,44 @@ export function computePosition(txs: Transaction[], upToDate?: string): Position
   return { quantity, costBasis, avgCost: quantity > 0 ? costBasis / quantity : 0, realizedPL, totalBought, totalSold }
 }
 
+/**
+ * Trades bought with USD/USDT from the portfolio take their THB cost from the cash position's
+ * average cost at that moment (so the THB you originally paid for the dollars carries over).
+ * Walks all transactions in date order and fills priceTHB/feeTHB of those pairs.
+ * Returns copies; the stored snapshot values are only a fallback when the cash leg is missing.
+ */
+export function resolveTransactions(txs: Transaction[]): Transaction[] {
+  const out = txs.map((t) => ({ ...t }))
+  const byId = new Map(out.map((t) => [t.id, t]))
+  const pos = new Map<string, { q: number; c: number }>()
+  for (const t of sortTx(out)) {
+    if (t.side === 'BUY' && t.currency && t.linkedTxId && t.priceFx != null) {
+      const leg = byId.get(t.linkedTxId)
+      const p = leg && pos.get(leg.assetId)
+      if (leg && p && p.q > 0) {
+        const avg = p.c / p.q
+        t.fxRate = avg
+        t.priceTHB = t.priceFx * avg
+        t.feeTHB = (t.feeFx ?? 0) * avg
+        leg.priceTHB = avg
+      }
+    }
+    const p = pos.get(t.assetId) ?? { q: 0, c: 0 }
+    if (t.side === 'BUY') {
+      p.q += t.quantity
+      p.c += t.quantity * t.priceTHB + (t.feeTHB || 0)
+    } else {
+      const q = Math.min(t.quantity, p.q)
+      const avg = p.q > 0 ? p.c / p.q : 0
+      p.c -= avg * q
+      p.q -= q
+      if (p.q < 1e-12) p.q = p.c = 0
+    }
+    pos.set(t.assetId, p)
+  }
+  return out
+}
+
 export interface Holding extends Position {
   asset: Asset
   price: number | null
